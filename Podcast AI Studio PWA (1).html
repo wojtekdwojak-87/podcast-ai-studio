@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="pl" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Podcast AI Studio</title>
+  <meta name="theme-color" content="#09090b">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Generator podcastów dwugłosowych AI napędzany przez Gemini i ElevenLabs">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            },
+            dark: {
+              bg: '#09090b',
+              surface: '#121215',
+              card: '#18181b',
+              border: '#27272a'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    input, textarea {
+      user-select: text;
+    }
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    /* Ukrycie paska przewijania przy zachowaniu funkcjonalności */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    /* Płynne przejścia */
+    .view-transition {
+      animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body class="bg-dark-bg text-zinc-100 min-h-screen flex flex-col justify-between selection:bg-indigo-500 selection:text-white">
+
+  <!-- Pasek górny (Header) -->
+  <header class="sticky top-0 z-40 bg-dark-bg/95 backdrop-blur-md border-b border-dark-border px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center space-x-2.5">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-emerald-400 p-0.5 shadow-lg shadow-indigo-500/20 flex items-center justify-center">
+        <span class="text-lg">🎙️</span>
+      </div>
+      <div>
+        <h1 class="font-bold text-sm leading-tight tracking-tight text-white flex items-center gap-1.5">
+          Podcast AI <span class="text-[10px] bg-indigo-500/20 text-indigo-300 font-mono px-1.5 py-0.5 rounded border border-indigo-500/30">PRO</span>
+        </h1>
+        <p class="text-[11px] text-zinc-400 leading-none">Studio Gemini + ElevenLabs</p>
+      </div>
+    </div>
+
+    <!-- Przyciski akcji w nagłówku -->
+    <div class="flex items-center space-x-2">
+      <!-- Przycisk instalacji PWA (widoczny na Androidzie) -->
+      <button id="pwaInstallBtn" onclick="triggerPWAInstall()" class="hidden px-2.5 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-xs font-medium flex items-center gap-1">
+        <span>📲</span> <span class="hidden sm:inline">Zainstaluj</span>
+      </button>
+
+      <!-- Status API / Ustawienia -->
+      <button onclick="switchTab('settings')" class="p-2 rounded-xl bg-dark-card hover:bg-zinc-800 border border-dark-border text-zinc-300 flex items-center space-x-1.5 transition">
+        <span id="apiStatusDot" class="w-2 h-2 rounded-full bg-amber-500"></span>
+        <span class="text-xs font-medium">Klucze</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Kontener powiadomień Toast -->
+  <div id="toastContainer" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 w-11/12 max-w-md pointer-events-none space-y-2"></div>
+
+  <!-- Główna zawartość z zakładkami -->
+  <main class="flex-1 max-w-2xl w-full mx-auto p-4 pb-28">
+
+    <!-- ZAKŁADKA 1: GENERATOR SCENARIUSZA (GEMINI) -->
+    <section id="tab-generator" class="view-transition space-y-4">
+      
+      <!-- Karta: Szybkie szablony -->
+      <div class="bg-dark-surface border border-dark-border rounded-2xl p-4 shadow-sm space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-indigo-400 tracking-wider uppercase flex items-center gap-1.5">
+            <span>✨</span> Gotowe presety podcastów
+          </span>
+          <span class="text-[10px] text-zinc-500 font-mono">1-kliknięcie</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2 text-left">
+          <button onclick="loadTemplate('borderline')" class="p-2.5 rounded-xl bg-dark-card border border-dark-border hover:border-indigo-500/50 text-left transition group">
+            <div class="text-xs font-semibold text-zinc-200 group-hover:text-indigo-300">💔 Związek z Borderline</div>
+            <div class="text-[10px] text-zinc-500 mt-0.5">Emocjonalna prawda, odrzucenie, granice</div>
+          </button>
+          <button onclick="loadTemplate('burnout')" class="p-2.5 rounded-xl bg-dark-card border border-dark-border hover:border-indigo-500/50 text-left transition group">
+            <div class="text-xs font-semibold text-zinc-200 group-hover:text-indigo-300">🧘‍♀️ Odzyskać siebie</div>
+            <div class="text-[10px] text-zinc-500 mt-0.5">Przebodźcowanie i presja bycia idealną</div>
+          </button>
+          <button onclick="loadTemplate('tech')" class="p-2.5 rounded-xl bg-dark-card border border-dark-border hover:border-indigo-500/50 text-left transition group">
+            <div class="text-xs font-semibold text-zinc-200 group-hover:text-indigo-300">🤖 AI w praktyce</div>
+            <div class="text-[10px] text-zinc-500 mt-0.5">Automatyzacja codziennych zadań</div>
+          </button>
+          <button onclick="loadTemplate('investigation')" class="p-2.5 rounded-xl bg-dark-card border border-dark-border hover:border-indigo-500/50 text-left transition group">
+            <div class="text-xs font-semibold text-zinc-200 group-hover:text-indigo-300">🔍 Tajemnica i śledztwo</div>
+            <div class="text-[10px] text-zinc-500 mt-0.5">Mroczny, wciągający styl narracyjny</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Karta: Konfiguracja Promptu Gemini -->
+      <div class="bg-dark-surface border border-dark-border rounded-2xl p-4 shadow-sm space-y-3.5">
+        <div class="flex items-center justify-between">
+          <label class="text-xs font-bold text-zinc-300 uppercase tracking-wider">Temat lub notatki odcinka</label>
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 font-mono">Gemini 3 Flash</span>
+        </div>
+
+        <textarea id="topicInput" rows="3" class="w-full bg-dark-bg border border-dark-border rounded-xl p-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-indigo-500 transition resize-none" placeholder="O czym ma być ten odcinek? Możesz wkleić tutaj surowy tekst z notatek, artykuł lub opisać historię..."></textarea>
+
+        <!-- Postacie -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[11px] font-medium text-zinc-400 mb-1">Rola 1 (np. Kobieta)</label>
+            <input id="role1Name" type="text" value="Marta" class="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-xs text-zinc-200 focus:border-indigo-500 focus:outline-none font-medium">
+          </div>
+          <div>
+            <label class="block text-[11px] font-medium text-zinc-400 mb-1">Rola 2 (np. Mężczyzna)</label>
+            <input id="role2Name" type="text" value="Adam" class="w-full bg-dark-bg border border-dark-border rounded-lg px-3 py-2 text-xs text-zinc-200 focus:border-indigo-500 focus:outline-none font-medium">
+          </div>
+        </div>
+
+        <!-- Styl i długość odcinka -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[11px] font-medium text-zinc-400 mb-1">Klimat rozmowy</label>
+            <select id="scriptStyle" class="w-full bg-dark-bg border border-dark-border rounded-lg px-2.5 py-2 text-xs text-zinc-300 focus:border-indigo-500 focus:outline-none">
+              <option value="intimate">Głęboki, intymny i poruszający</option>
+              <option value="dynamic">Dynamiczny radiowy / publicystyczny</option>
+              <option value="therapeutic">Spokojny, kojący i refleksyjny</option>
+              <option value="storytelling">Filmowy storytelling</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[11px] font-medium text-zinc-400 mb-1">Długość scenariusza</label>
+            <select id="scriptLength" class="w-full bg-dark-bg border border-dark-border rounded-lg px-2.5 py-2 text-xs text-zinc-300 focus:border-indigo-500 focus:outline-none">
+              <option value="short">Krótki teaser (~6-8 kwestii)</option>
+              <option value="medium" selected>Standardowy odcinek (~14-18 kwestii)</option>
+              <option value="long">Pełny, długi podcast (~24-30 kwestii)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Przycisk generowania Gemini -->
+        <button id="btnGenerateGemini" onclick="generateScriptWithGemini()" class="w-full py-3.5 bg-gradient-to-r from-indigo-600 via-indigo-500 to-indigo-700 hover:opacity-95 active:scale-[0.99] rounded-xl font-bold text-sm text-white shadow-lg shadow-indigo-600/25 flex items-center justify-center space-x-2 transition">
+          <span id="geminiSpinner" class="hidden animate-spin">⚡</span>
+          <span id="geminiBtnText">Generuj Scenariusz z AI</span>
+        </button>
+      </div>
+    </section>
+
+
+    <!-- ZAKŁADKA 2: EDYTOR DIALOGÓW -->
+    <section id="tab-editor" class="view-transition space-y-4 hidden">
+      <div class="bg-dark-surface border border-dark-border rounded-2xl p-4 shadow-sm space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-xs font-bold text-zinc-300 uppercase tracking-wider">Edytor kwestii</h2>
+            <p class="text-[11px] text-zinc-500">Sprawdź kwestie przed wysłaniem do ElevenLabs</p>
+          </div>
+          <div class="flex items-center space-x-1.5">
+            <button onclick="cleanBracketTags()" title="Usuwa [nawiasy] i didaskalia" class="px-2.5 py-1 text-[11px] rounded-lg bg-dark-card border border-dark-border text-zinc-300 hover:text-indigo-400 transition">
+              🧹 Oczyść tagi
+            </button>
+            <button onclick="loadSampleScript()" class="px-2.5 py-1 text-[11px] rounded-lg bg-dark-card border border-dark-border text-zinc-400 hover:text-zinc-200 transition">
+              Wklej demo
+            </button>
+          </div>
+        </div>
+
+        <!-- Pole tekstowe scenariusza -->
+        <textarea id="rawScriptArea" rows="11" oninput="updateScriptStats()" class="w-full bg-dark-bg border border-dark-border rounded-xl p-3 text-xs mono leading-relaxed text-zinc-200 placeholder-zinc-700 focus:outline-none focus:border-indigo-500 transition" placeholder="Marta: Pytanie do Adama...&#10;&#10;Adam: Odpowiedź oparta na faktach..."></textarea>
+
+        <!-- Statystyki tekstu -->
+        <div class="flex items-center justify-between text-[11px] text-zinc-500 pt-1 border-t border-dark-border">
+          <span id="statLineCount">0 kwestii</span>
+          <span id="statCharCount">0 znaków ElevenLabs</span>
+          <span id="statEstDuration">Szac. czas: 0:00</span>
+        </div>
+
+        <button onclick="switchTab('studio')" class="w-full py-3 bg-zinc-800 hover:bg-zinc-700 active:scale-[0.99] rounded-xl font-semibold text-xs text-zinc-200 transition flex items-center justify-center gap-1.5">
+          <span>Przejdź do studia nagrań audio</span> ➔
+        </button>
+      </div>
+    </section>
+
+
+    <!-- ZAKŁADKA 3: ELEVENLABS AUDIO STUDIO -->
+    <section id="tab-studio" class="view-transition space-y-4 hidden">
+      
+      <!-- Konfiguracja głosów ElevenLabs -->
+      <div class="bg-dark-surface border border-dark-border rounded-2xl p-4 shadow-sm space-y-4">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-emerald-400 tracking-wider uppercase flex items-center gap-1">
+            <span>🎙️</span> Wybór Lektorów ElevenLabs
+          </span>
+          <button onclick="fetchVoicesFromElevenLabs()" class="text-[11px] text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
+            <span>🔄</span> Odśwież głosy
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <!-- Głos Rola 1 -->
+          <div class="bg-dark-card border border-dark-border rounded-xl p-3 space-y-2">
+            <div class="flex justify-between items-center">
+              <span id="voiceLabel1" class="text-xs font-bold text-indigo-400">Rola 1 (Marta)</span>
+              <button onclick="testVoice(1)" type="button" class="text-[10px] bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded flex items-center gap-1 transition active:scale-95">
+                <span>▶️</span> Test głosu
+              </button>
+            </div>
+            <select id="voiceSelect1" class="w-full bg-dark-bg border border-dark-border rounded-lg p-2 text-xs text-zinc-200 focus:border-indigo-500 focus:outline-none"></select>
+          </div>
+
+          <!-- Głos Rola 2 -->
+          <div class="bg-dark-card border border-dark-border rounded-xl p-3 space-y-2">
+            <div class="flex justify-between items-center">
+              <span id="voiceLabel2" class="text-xs font-bold text-emerald-400">Rola 2 (Adam)</span>
+              <button onclick="testVoice(2)" type="button" class="text-[10px] bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded flex items-center gap-1 transition active:scale-95">
+                <span>▶️</span> Test głosu
+              </button>
+            </div>
+            <select id="voiceSelect2" class="w-full bg-dark-bg border border-dark-border rounded-lg p-2 text-xs text-zinc-200 focus:border-indigo-500 focus:outline-none"></select>
+          </div>
+        </div>
+
+        <!-- Ustawienia zaawansowane głosu -->
+        <div class="bg-dark-card border border-dark-border rounded-xl p-3 space-y-3">
+          <div class="text-[11px] font-bold text-zinc-300 uppercase tracking-wider">Ekspresja i model mowy</div>
+          <div>
+            <label class="block text-[10px] text-zinc-400 mb-1">Model syntezy ElevenLabs</label>
+            <select id="elevenModelSelect" class="w-full bg-dark-bg border border-dark-border rounded-lg px-2.5 py-2 text-xs text-zinc-200 focus:border-indigo-500 focus:outline-none">
+              <option value="eleven_multilingual_v2" selected>Eleven Multilingual v2 (Rekomendowany do podcastów PL)</option>
+              <option value="eleven_v4">Eleven v4 (Flagowy model wielojęzyczny)</option>
+              <option value="eleven_flash_v2_5">Eleven Flash v2.5 (Błyskawiczna synteza audio)</option>
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <div class="flex justify-between text-[10px] text-zinc-400 mb-1">
+                <span>Stabilność (Stability)</span>
+                <span id="valStability">38%</span>
+              </div>
+              <input type="range" id="paramStability" min="15" max="85" value="38" oninput="document.getElementById('valStability').textContent = this.value + '%'" class="w-full accent-indigo-500">
+            </div>
+            <div>
+              <div class="flex justify-between text-[10px] text-zinc-400 mb-1">
+                <span>Pauza między kwestiami</span>
+                <span id="valPause">300 ms</span>
+              </div>
+              <input type="range" id="paramPause" min="100" max="800" step="50" value="300" oninput="document.getElementById('valPause').textContent = this.value + ' ms'" class="w-full accent-indigo-500">
+            </div>
+          </div>
+        </div>
+
+        <!-- Status / Pasek postępu generowania -->
+        <div id="synthesisProgressBox" class="hidden space-y-2 bg-dark-card border border-emerald-500/30 rounded-xl p-3">
+          <div class="flex justify-between items-center text-xs">
+            <span id="synthesisStatusText" class="text-zinc-200 font-medium">Rozpoczynam nagrywanie...</span>
+            <span id="synthesisPercent" class="text-emerald-400 font-mono font-bold">0%</span>
+          </div>
+          <div class="w-full bg-dark-bg rounded-full h-2 overflow-hidden border border-dark-border">
+            <div id="synthesisProgressBar" class="bg-gradient-to-r from-emerald-500 to-indigo-500 h-full w-0 transition-all duration-300"></div>
+          </div>
+        </div>
+
+        <!-- Główny przycisk syntezy -->
+        <button id="btnStartSynthesis" onclick="startPodcastSynthesis()" class="w-full py-4 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:opacity-95 active:scale-[0.99] rounded-xl font-bold text-sm text-white shadow-lg shadow-emerald-600/25 flex items-center justify-center space-x-2 transition">
+          <span id="synthesisIcon">🎧</span>
+          <span id="synthesisBtnText">Wygeneruj Cały Podcast (ElevenLabs)</span>
+        </button>
+      </div>
+    </section>
+
+
+    <!-- ZAKŁADKA 4: ODTWARZACZ I EKSPORT -->
+    <section id="tab-player" class="view-transition space-y-4 hidden">
+      <div class="bg-dark-surface border border-dark-border rounded-2xl p-5 shadow-sm space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-sm font-bold text-white">Master Audio Podcastu</h2>
+            <p id="playerSubtitle" class="text-xs text-zinc-400">Gotowy plik zmontowany z dwóch głosów</p>
+          </div>
+          <span class="text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full font-mono">WAV 44.1kHz</span>
+        </div>
+
+        <!-- Canvas Wizualizacji Fal Audio -->
+        <div class="w-full h-24 bg-dark-bg rounded-xl border border-dark-border overflow-hidden relative flex items-center justify-center">
+          <canvas id="waveformCanvas" class="w-full h-full block"></canvas>
+          <div id="emptyWaveformNotice" class="absolute text-xs text-zinc-600 flex items-center gap-1.5 pointer-events-none">
+            <span>🎵</span> Wygeneruj lub załaduj podcast, by uruchomić odsłuch
+          </div>
+        </div>
+
+        <!-- Natywny element audio -->
+        <audio id="mainAudioElement" controls class="w-full h-11 rounded-lg"></audio>
+
+        <!-- Akcje pobierania i udostępniania -->
+        <div class="grid grid-cols-2 gap-2 pt-2">
+          <button id="btnDownloadWav" onclick="downloadMasterAudioFile()" disabled class="py-3 px-3 bg-indigo-600 disabled:bg-zinc-800 disabled:text-zinc-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-md">
+            <span>💾</span> Pobierz .WAV
+          </button>
+          <button id="btnExportScript" onclick="exportScriptTextFile()" class="py-3 px-3 bg-dark-card border border-dark-border hover:bg-zinc-800 text-zinc-200 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-2">
+            <span>📄</span> Pobierz Tekst
+          </button>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ZAKŁADKA 5: USTAWIENIA KLUCZY API -->
+    <section id="tab-settings" class="view-transition space-y-4 hidden">
+      <div class="bg-dark-surface border border-dark-border rounded-2xl p-5 shadow-sm space-y-4">
+        <div>
+          <h2 class="text-sm font-bold text-white">Konfiguracja Kluczy API</h2>
+          <p class="text-xs text-zinc-400 mt-0.5">Klucze są przechowywane wyłącznie w pamięci Twojego telefonu (localStorage).</p>
+        </div>
+
+        <div class="space-y-3">
+          <!-- Gemini Key -->
+          <div>
+            <div class="flex justify-between items-center mb-1">
+              <label class="text-xs font-semibold text-zinc-300">Gemini API Key</label>
+              <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-[10px] text-indigo-400 hover:underline">Pobierz darmowy klucz ↗</a>
+            </div>
+            <input id="inputGeminiKey" type="password" placeholder="AIzaSy..." class="w-full bg-dark-bg border border-dark-border rounded-xl px-3 py-2.5 text-xs text-zinc-100 mono focus:border-indigo-500 focus:outline-none">
+            <p class="text-[10px] text-zinc-500 mt-1">W środowisku deweloperskim może pozostać pusty.</p>
+          </div>
+
+          <!-- ElevenLabs Key -->
+          <div>
+            <div class="flex justify-between items-center mb-1">
+              <label class="text-xs font-semibold text-zinc-300">ElevenLabs API Key</label>
+              <a href="https://elevenlabs.io/app/speech-synthesis" target="_blank" class="text-[10px] text-emerald-400 hover:underline">Panel ElevenLabs ↗</a>
+            </div>
+            <input id="inputElevenKey" type="password" placeholder="xi-api-key..." class="w-full bg-dark-bg border border-dark-border rounded-xl px-3 py-2.5 text-xs text-zinc-100 mono focus:border-indigo-500 focus:outline-none">
+            
+            <!-- Wskazówka CLI Onboard -->
+            <div class="p-3 mt-2 rounded-xl bg-dark-card border border-indigo-500/30 text-[11px] text-zinc-300 space-y-1.5">
+              <div class="font-bold text-indigo-400 flex items-center gap-1.5">
+                <span>⚡</span> Automatyczna autoryzacja CLI (Onboard):
+              </div>
+              <p class="text-zinc-400 text-[10px] leading-relaxed">
+                Jeśli korzystasz z komputera, uruchom poniższe polecenie w terminalu, aby zalogować się jednym kliknięciem i pobrać klucz:
+              </p>
+              <div class="bg-dark-bg border border-dark-border p-2 rounded-lg flex items-center justify-between">
+                <code class="mono text-emerald-400 text-[10px] select-all">npx -y @elevenlabs/cli@latest onboard init</code>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button onclick="saveAllApiKeys()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 active:scale-[0.99] text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-600/20 transition">
+          Zapisz i przetestuj połączenie
+        </button>
+      </div>
+
+      <!-- Instrukcja instalacji na Androidzie -->
+      <div class="bg-dark-surface border border-dark-border rounded-2xl p-5 shadow-sm space-y-2">
+        <h3 class="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
+          <span>📲</span> Jak zainstalować tę aplikację na telefonie?
+        </h3>
+        <ol class="text-xs text-zinc-400 space-y-1.5 list-decimal list-inside leading-relaxed">
+          <li>Wgraj ten plik <span class="mono text-zinc-300">index.html</span> do darmowego repozytorium na <b>GitHub</b>.</li>
+          <li>Włącz <b>GitHub Pages</b> w ustawieniach repozytorium (<span class="mono text-zinc-300">Settings -> Pages</span>).</li>
+          <li>Otwórz wygenerowany adres w przeglądarce <b>Google Chrome</b> na telefonie z Androidem.</li>
+          <li>Kliknij menu (trzy kropki w prawym górnym rogu) i wybierz <b>„Zainstaluj aplikację”</b> lub <b>„Dodaj do ekranu głównego”</b>.</li>
+        </ol>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Pasek nawigacji dolnej (Mobile Bottom Nav) -->
+  <nav class="fixed bottom-0 left-0 right-0 z-40 bg-dark-bg/95 backdrop-blur-lg border-t border-dark-border px-2 py-2">
+    <div class="max-w-md mx-auto grid grid-cols-5 gap-1">
+      <button onclick="switchTab('generator')" id="nav-generator" class="nav-btn py-1.5 flex flex-col items-center justify-center rounded-xl text-indigo-400 font-semibold transition">
+        <span class="text-lg">✨</span>
+        <span class="text-[10px] mt-0.5">Scenariusz</span>
+      </button>
+      <button onclick="switchTab('editor')" id="nav-editor" class="nav-btn py-1.5 flex flex-col items-center justify-center rounded-xl text-zinc-500 hover:text-zinc-300 transition">
+        <span class="text-lg">📝</span>
+        <span class="text-[10px] mt-0.5">Kwestie</span>
+      </button>
+      <button onclick="switchTab('studio')" id="nav-studio" class="nav-btn py-1.5 flex flex-col items-center justify-center rounded-xl text-zinc-500 hover:text-zinc-300 transition">
+        <span class="text-lg">🎙️</span>
+        <span class="text-[10px] mt-0.5">Studio</span>
+      </button>
+      <button onclick="switchTab('player')" id="nav-player" class="nav-btn py-1.5 flex flex-col items-center justify-center rounded-xl text-zinc-500 hover:text-zinc-300 transition">
+        <span class="text-lg">🎧</span>
+        <span class="text-[10px] mt-0.5">Odtwórz</span>
+      </button>
+      <button onclick="switchTab('settings')" id="nav-settings" class="nav-btn py-1.5 flex flex-col items-center justify-center rounded-xl text-zinc-500 hover:text-zinc-300 transition">
+        <span class="text-lg">⚙️</span>
+        <span class="text-[10px] mt-0.5">Opcje</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- LOGIKA APLIKACJI W JAVASCRIPT -->
+  <script>
+    // Domyślne głosy ElevenLabs (fallback w razie braku połączenia)
+    const DEFAULT_ELEVEN_VOICES = [
+      { voice_id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah (Kobiecy - Głęboki, Ciepły)", gender: "female" },
+      { voice_id: "21m00Tcm4TlvDq8ikWAM", name: "Rachel (Kobiecy - Spokojny)", gender: "female" },
+      { voice_id: "ThT5KcBeYPX3keUQqHPh", name: "Dorothy (Kobiecy - Młody, Emocjonalny)", gender: "female" },
+      { voice_id: "pNInz6obpgDQGcFmaJgB", name: "Adam (Męski - Niski, Radiowy)", gender: "male" },
+      { voice_id: "ErXwobaYiN019PkySvjV", name: "Antoni (Męski - Wyważony)", gender: "male" },
+      { voice_id: "JBFqnCBsd6RMkjVDRZzb", name: "George (Męski - Refleksyjny)", gender: "male" }
+    ];
+
+    // Gotowe szablony scenariuszy
+    const PRESET_TEMPLATES = {
+      borderline: {
+        topic: "Związek z osobą borderline: psychologia, huśtawka emocjonalna od uwielbienia po odrzucenie, kłamstwo w żywe oczy, zjawisko ucieczek i blokowania kontaktu (silent treatment) oraz nauka stawiania twardych granic z miłości do samego siebie.",
+        role1: "Marta",
+        role2: "Adam",
+        style: "intimate",
+        length: "medium"
+      },
+      burnout: {
+        topic: "Syndrom wiecznej grzeczności u kobiet, wypalenie emocjonalne spowodowane zadowalaniem innych, ciągłe poczucie winy i nauka mówienia 'nie' bez konieczności tłumaczenia się.",
+        role1: "Lena",
+        role2: "Karolina",
+        style: "therapeutic",
+        length: "medium"
+      },
+      tech: {
+        topic: "Praktyczne zastosowanie sztucznej inteligencji i mikroskryptów na telefonie w codziennej pracy zamiast ręcznego klepania raportów. Jak zaoszczędzić 10 godzin tygodniowo.",
+        role1: "Kasia",
+        role2: "Marek",
+        style: "dynamic",
+        length: "short"
+      },
+      investigation: {
+        topic: "Mroczne kulisy manipulacji internetowej: jak algorytmy i farmy trolli kształtują to, co czujemy i komu ustrzegamy się wierzyć.",
+        role1: "Dziennikarka",
+        role2: "Ekspert Cyber",
+        style: "storytelling",
+        length: "medium"
+      }
+    };
+
+    // Globalny stan aplikacji
+    let currentVoices = [...DEFAULT_ELEVEN_VOICES];
+    let masterAudioBlob = null;
+    let deferredPrompt = null;
+    let isSynthesizing = false;
+
+    // Elementy wizualizera Canvas
+    let audioContext = null;
+    let analyserNode = null;
+    let visualizerAnimationId = null;
+
+    // Inicjalizacja przy załadowaniu DOM
+    window.addEventListener('DOMContentLoaded', () => {
+      initAppKeys();
+      populateVoiceSelectors();
+      setupDynamicPwaManifest();
+      loadSampleScript();
+      checkApiStatus();
+      setupWaveformCanvas();
+    });
+
+    // Obsługa instalacji PWA na Androidzie
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      const installBtn = document.getElementById('pwaInstallBtn');
+      if (installBtn) installBtn.classList.remove('hidden');
+    });
+
+    function triggerPWAInstall() {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((choiceResult) => {
+          if (choiceResult.outcome === 'accepted') {
+            showToast('Dziękujemy za instalację!', 'success');
+          }
+          deferredPrompt = null;
+          document.getElementById('pwaInstallBtn').classList.add('hidden');
+        });
+      } else {
+        showToast('Wybierz w menu Chrome: Dodaj do ekranu głównego', 'info');
+      }
+    }
+
+    // Zarządzanie zakładkami (Tabs)
+    function switchTab(tabId) {
+      const tabs = ['generator', 'editor', 'studio', 'player', 'settings'];
+      tabs.forEach(t => {
+        const el = document.getElementById(`tab-${t}`);
+        const btn = document.getElementById(`nav-${t}`);
+        if (el) el.classList.toggle('hidden', t !== tabId);
+        if (btn) {
+          if (t === tabId) {
+            btn.className = 'nav-btn py-1.5 flex flex-col items-center justify-center rounded-xl text-indigo-400 font-bold transition';
+          } else {
+            btn.className = 'nav-btn py-1.5 flex flex-col items-center justify-center rounded-xl text-zinc-500 hover:text-zinc-300 transition';
+          }
+        }
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Toast Notifications
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      
+      let bg = 'bg-zinc-900 border-zinc-700 text-zinc-100';
+      let icon = 'ℹ️';
+      if (type === 'success') {
+        bg = 'bg-emerald-950/90 border-emerald-500/50 text-emerald-200';
+        icon = '✅';
+      } else if (type === 'error') {
+        bg = 'bg-red-950/90 border-red-500/50 text-red-200';
+        icon = '⚠️';
+      }
+
+      toast.className = `p-3 rounded-xl border shadow-xl flex items-center gap-2 text-xs font-medium pointer-events-auto transition-all transform duration-200 ${bg}`;
+      toast.innerHTML = `<span>${icon}</span><span class="flex-1">${message}</span>`;
+      
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(-10px)';
+        setTimeout(() => toast.remove(), 250);
+      }, 3500);
+    }
+
+    // Zarządzanie kluczami API
+    function initAppKeys() {
+      const geminiKey = localStorage.getItem('podcast_gemini_key') || '';
+      const elevenKey = localStorage.getItem('podcast_eleven_key') || '';
+      document.getElementById('inputGeminiKey').value = geminiKey;
+      document.getElementById('inputElevenKey').value = elevenKey;
+      if (elevenKey) {
+        fetchVoicesFromElevenLabs();
+      }
+    }
+
+    function saveAllApiKeys() {
+      const g = document.getElementById('inputGeminiKey').value.trim();
+      const e = document.getElementById('inputElevenKey').value.trim();
+      localStorage.setItem('podcast_gemini_key', g);
+      localStorage.setItem('podcast_eleven_key', e);
+      showToast('Klucze zostały zapisane lokalnie', 'success');
+      checkApiStatus();
+      if (e) fetchVoicesFromElevenLabs();
+    }
+
+    function checkApiStatus() {
+      const g = localStorage.getItem('podcast_gemini_key') || '';
+      const e = localStorage.getItem('podcast_eleven_key') || '';
+      const dot = document.getElementById('apiStatusDot');
+      if (e) {
+        dot.className = 'w-2 h-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500';
+      } else if (g) {
+        dot.className = 'w-2 h-2 rounded-full bg-indigo-500';
+      } else {
+        dot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
+      }
+    }
+
+    // Ładowanie predefiniowanych szablonów
+    function loadTemplate(key) {
+      const t = PRESET_TEMPLATES[key];
+      if (!t) return;
+      document.getElementById('topicInput').value = t.topic;
+      document.getElementById('role1Name').value = t.role1;
+      document.getElementById('role2Name').value = t.role2;
+      document.getElementById('scriptStyle').value = t.style;
+      document.getElementById('scriptLength').value = t.length;
+      showToast(`Załadowano preset: ${t.role1} & ${t.role2}`, 'info');
+    }
+
+    // GENEROWANIE SCENARIUSZA PRZEZ GEMINI
+    async function generateScriptWithGemini() {
+      const topic = document.getElementById('topicInput').value.trim();
+      if (!topic) {
+        showToast('Wpisz temat lub wybierz gotowy preset u góry', 'error');
+        return;
+      }
+
+      const role1 = document.getElementById('role1Name').value.trim() || 'Marta';
+      const role2 = document.getElementById('role2Name').value.trim() || 'Adam';
+      const style = document.getElementById('scriptStyle').value;
+      const length = document.getElementById('scriptLength').value;
+
+      let lineCount = "14 do 18 wypowiedzi łącznie";
+      if (length === 'short') lineCount = "6 do 8 konkretnych, mocnych kwestii";
+      if (length === 'long') lineCount = "24 do 30 rozbudowanych, głębokich wypowiedzi";
+
+      const btn = document.getElementById('btnGenerateGemini');
+      const spinner = document.getElementById('geminiSpinner');
+      const btnText = document.getElementById('geminiBtnText');
+
+      btn.disabled = true;
+      spinner.classList.remove('hidden');
+      btnText.textContent = 'Gemini pisze scenariusz podcastu...';
+
+      // Instrukcja systemowa wyprofilowana idealnie pod syntezę ElevenLabs
+      const systemPrompt = `Jesteś zawodowym scenarzystą topowych podcastów psychologiczno-dokumentalnych.
+Piszesz wciągający, realistyczny dwugłosowy dialog między:
+- ${role1} (prowadząca, empatyczna, dociekliwa)
+- ${role2} (mówi z własnego doświadczenia, autentyczny, bez owijania w bawełnę)
+
+KLUCZOWE REGUŁY DLA SYNTEZATORA ELEVENLABS:
+1. Pisz WYŁĄCZNIE kwestie postaci w formacie:
+${role1}: Treść wypowiedzi...
+${role2}: Treść wypowiedzi...
+2. KATEGORYCZNY ZAKAZ jakichkolwiek didaskaliów w nawiasach kwadratowych [ ] lub okrągłych ( ), np. [westchnienie], [pauza], (cicho). Syntezator przeczyta je na głos!
+3. Zamiast nawiasów steruj tempem i oddechem za pomocą interpunkcji: wielokropki (...), myślniki (—), przecinki i znaki zapytania.
+4. Całość ma zawierać dokładnie: ${lineCount}.
+5. Język: polski, naturalna polszczyzna mówiona, intymna dynamika, surowe fakty, zero sztucznego coachingu.`;
+
+      const userQuery = `Napisz pełny scenariusz podcastu na temat:\n${topic}\n\nKlimat rozmowy: ${style}.`;
+
+      // API Key: jeśli podano w opcjach to użyj, w przeciwnym razie "" (Canvas runtime wstawi swój)
+      const apiKey = localStorage.getItem('podcast_gemini_key') || "";
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+      const payload = {
+        contents: [{ role: 'user', parts: [{ text: userQuery }] }],
+        systemInstruction: {
+          parts: [{ text: systemPrompt }]
+        }
+      };
+
+      try {
+        const response = await fetchWithRetry(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        const script = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+        if (!script) {
+          throw new Error('Model nie zwrócił tekstu scenariusza.');
+        }
+
+        document.getElementById('rawScriptArea').value = script.trim();
+        updateScriptStats();
+        showToast('Scenariusz gotowy! Przełączam do edytora', 'success');
+        switchTab('editor');
+      } catch (err) {
+        showToast('Błąd generowania: ' + err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        spinner.classList.add('hidden');
+        btnText.textContent = 'Generuj Scenariusz z AI';
+      }
+    }
+
+    // Pomocnik do wywołań sieciowych z retry (exponential backoff)
+    async function fetchWithRetry(url, options, maxRetries = 3) {
+      let delay = 1000;
+      for (let i = 0; i < maxRetries; i++) {
+        try {
+          const res = await fetch(url, options);
+          if (res.ok) return res;
+          if (res.status === 429 && i < maxRetries - 1) {
+            await new Promise(r => setTimeout(r, delay));
+            delay *= 2;
+            continue;
+          }
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData?.error?.message || `Status HTTP ${res.status}`);
+        } catch (e) {
+          if (i === maxRetries - 1) throw e;
+          await new Promise(r => setTimeout(r, delay));
+          delay *= 2;
+        }
+      }
+    }
+
+    // Czyszczenie didaskaliów
+    function cleanBracketTags() {
+      let val = document.getElementById('rawScriptArea').value;
+      val = val.replace(/\[.*?\]/g, '');
+      val = val.replace(/\(.*?\)/g, '');
+      val = val.replace(/^\*.*?\*$/gm, '');
+      val = val.replace(/[ \t]+/g, ' ');
+      document.getElementById('rawScriptArea').value = val.trim();
+      updateScriptStats();
+      showToast('Oczyszczono tekst z nawiasów i didaskaliów', 'success');
+    }
+
+    // Statystyki scenariusza
+    function updateScriptStats() {
+      const text = document.getElementById('rawScriptArea').value;
+      const lines = text.split('\n').filter(l => l.trim().length > 0 && l.includes(':'));
+      const charCount = text.length;
+      
+      // Przybliżony czas czytania: ~900 znaków na minutę przy naturalnej mowie
+      const estMinutes = (charCount / 900).toFixed(1);
+
+      document.getElementById('statLineCount').textContent = `${lines.length} kwestii`;
+      document.getElementById('statCharCount').textContent = `${charCount} znaków ElevenLabs`;
+      document.getElementById('statEstDuration').textContent = `Szac. czas: ~${estMinutes} min`;
+
+      // Aktualizacja etykiet ról w studiu
+      const role1 = document.getElementById('role1Name').value.trim() || 'Marta';
+      const role2 = document.getElementById('role2Name').value.trim() || 'Adam';
+      document.getElementById('voiceLabel1').textContent = `Rola 1 (${role1})`;
+      document.getElementById('voiceLabel2').textContent = `Rola 2 (${role2})`;
+    }
+
+    // Szybki test głosu wybranego lektora
+    async function testVoice(roleNum) {
+      const apiKey = localStorage.getItem('podcast_eleven_key');
+      if (!apiKey) {
+        showToast('Wprowadź klucz ElevenLabs w Opcjach, aby przetestować głos', 'error');
+        switchTab('settings');
+        return;
+      }
+      const selectId = roleNum === 1 ? 'voiceSelect1' : 'voiceSelect2';
+      const voiceId = document.getElementById(selectId).value;
+      const roleName = (roleNum === 1 ? document.getElementById('role1Name').value : document.getElementById('role2Name').value) || 'Prezenter';
+      const modelId = document.getElementById('elevenModelSelect')?.value || 'eleven_multilingual_v2';
+      
+      showToast(`Generuję próbkę głosu dla: ${roleName}...`, 'info');
+      try {
+        const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+          method: 'POST',
+          headers: {
+            'xi-api-key': apiKey,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            text: `Cześć! Nazywam się ${roleName} i tak brzmi mój głos w tym podcaście.`,
+            model_id: modelId,
+            voice_settings: { stability: 0.45, similarity_boost: 0.8 }
+          })
+        });
+        if (!res.ok) throw new Error('Błąd autoryzacji lub limitu znaków');
+        const blob = await res.blob();
+        const testAudio = new Audio(URL.createObjectURL(blob));
+        testAudio.play();
+        showToast('Odtwarzam próbkę audio lektora', 'success');
+      } catch (e) {
+        showToast('Błąd testu głosu: ' + e.message, 'error');
+      }
+    }
+
+    // Załadowanie dema
+    function loadSampleScript() {
+      const demo = `Marta: Kiedy ludzie słyszą słowo borderline, najczęściej myślą o suchych definicjach medycznych. Ale ty w tym żyłeś od środka. Jak to wygląda naprawdę, kiedy gasną światła i zostajesz z tą drugą osobą sam na sam?
+
+Adam: To się zaczyna jak najpiękniejszy sen na świecie, Marto. Na początku jesteś dla niej całym wszechświatem. Nikt cię nigdy tak nie uwielbiał. Ale bardzo szybko ten sen zamienia się w pole minowe. Budzisz się rano... i twoją pierwszą myślą jest: jaka jest dzisiaj pogoda emocjonalna w pokoju? Czy jestem bohaterem... czy największym wrogiem?
+
+Marta: Chodzisz na palcach we własnym domu.
+
+Adam: Chodzisz na palcach, żeby nie wywołać wybuchu. Ale najgorsze nie są krzyki. Najgorsze jest to, co dzieje się z twoim umysłem, gdy przyłapujesz ją na kłamstwie, a ona bez mrugnięcia okiem mówi: to twoja wina, to ty mnie prowokujesz. Zaczynasz wątpić we własne zmysły.
+
+Marta: I w końcu przychodzi moment, w którym telefon wibruje po dniach ciszy. Co wtedy trzeba zrobić?
+
+Adam: Puścić telefon z rąk. Zero pośpiechu. Trzymać się faktów jak kotwicy i postawić twardą granicę: terapia albo koniec. Bo ocalenie siebie to nie egoizm. To jedyny obowiązek, z którego nikt cię na tym świecie nie zwolni.`;
+
+      document.getElementById('rawScriptArea').value = demo;
+      updateScriptStats();
+    }
+
+    // ELEVENLABS: Pobieranie listy głosów użytkownika
+    async function fetchVoicesFromElevenLabs() {
+      const apiKey = localStorage.getItem('podcast_eleven_key');
+      if (!apiKey) {
+        showToast('Wpisz klucz ElevenLabs w zakładce Opcje', 'info');
+        return;
+      }
+
+      showToast('Pobieram Twoje głosy z ElevenLabs...', 'info');
+      try {
+        const res = await fetch('https://api.elevenlabs.io/v1/voices', {
+          headers: { 'xi-api-key': apiKey }
+        });
+        if (!res.ok) throw new Error('Błędny klucz ElevenLabs lub brak uprawnień.');
+        const data = await res.json();
+        
+        if (data.voices && data.voices.length > 0) {
+          currentVoices = data.voices.map(v => ({
+            voice_id: v.voice_id,
+            name: `${v.name} (${v.labels?.gender || 'głos'} - ${v.category || 'custom'})`,
+            gender: (v.labels?.gender || '').toLowerCase()
+          }));
+          populateVoiceSelectors();
+          showToast(`Załadowano ${currentVoices.length} głosów z Twojego konta!`, 'success');
+        }
+      } catch (err) {
+        showToast('Nie udało się pobrać głosów: ' + err.message, 'error');
+        populateVoiceSelectors();
+      }
+    }
+
+    function populateVoiceSelectors() {
+      const sel1 = document.getElementById('voiceSelect1');
+      const sel2 = document.getElementById('voiceSelect2');
+      sel1.innerHTML = '';
+      sel2.innerHTML = '';
+
+      currentVoices.forEach(v => {
+        const opt1 = document.createElement('option');
+        opt1.value = v.voice_id;
+        opt1.textContent = v.name;
+        sel1.appendChild(opt1);
+
+        const opt2 = document.createElement('option');
+        opt2.value = v.voice_id;
+        opt2.textContent = v.name;
+        sel2.appendChild(opt2);
+      });
+
+      // Domyślny dobór: żeński dla Roli 1, męski dla Roli 2
+      const female = currentVoices.find(v => v.gender === 'female');
+      const male = currentVoices.find(v => v.gender === 'male');
+      if (female) sel1.value = female.voice_id;
+      if (male) sel2.value = male.voice_id;
+    }
+
+    // SYNTEZA PODCASTU I SCALANIE DŹWIĘKU
+    async function startPodcastSynthesis() {
+      if (isSynthesizing) return;
+
+      const apiKey = localStorage.getItem('podcast_eleven_key');
+      if (!apiKey) {
+        showToast('Wymagany klucz ElevenLabs API! Przejdź do Opcji.', 'error');
+        switchTab('settings');
+        return;
+      }
+
+      const script = document.getElementById('rawScriptArea').value.trim();
+      if (!script) {
+        showToast('Scenariusz w edytorze jest pusty!', 'error');
+        switchTab('editor');
+        return;
+      }
+
+      const role1 = document.getElementById('role1Name').value.trim() || 'Marta';
+      const role2 = document.getElementById('role2Name').value.trim() || 'Adam';
+      const voice1 = document.getElementById('voiceSelect1').value;
+      const voice2 = document.getElementById('voiceSelect2').value;
+      const stability = parseFloat(document.getElementById('paramStability').value) / 100;
+      const pauseDuration = parseInt(document.getElementById('paramPause').value, 10) / 1000;
+      const selectedModel = document.getElementById('elevenModelSelect')?.value || 'eleven_multilingual_v2';
+
+      // Rozbicie na poszczególne kwestie
+      const rawLines = script.split('\n')
+        .map(l => l.trim())
+        .filter(l => l.length > 0 && l.includes(':'));
+
+      const parsedLines = [];
+      for (const raw of rawLines) {
+        const colonIdx = raw.indexOf(':');
+        const speaker = raw.substring(0, colonIdx).trim();
+        const speech = raw.substring(colonIdx + 1).trim();
+        if (speech.length > 0) {
+          parsedLines.push({
+            speaker: speaker,
+            isRole1: speaker.toLowerCase().includes(role1.toLowerCase()),
+            text: speech
+          });
+        }
+      }
+
+      if (parsedLines.length === 0) {
+        showToast(`Nie znaleziono kwestii z prefiksem "${role1}:" lub "${role2}:"`, 'error');
+        return;
+      }
+
+      // Inicjalizacja Web Audio API
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+
+      // UI postępu
+      isSynthesizing = true;
+      const progressBox = document.getElementById('synthesisProgressBox');
+      const progressBar = document.getElementById('synthesisProgressBar');
+      const progressText = document.getElementById('synthesisStatusText');
+      const progressPct = document.getElementById('synthesisPercent');
+      const btn = document.getElementById('btnStartSynthesis');
+
+      progressBox.classList.remove('hidden');
+      btn.disabled = true;
+      btn.classList.add('opacity-50');
+
+      const collectedBuffers = [];
+
+      try {
+        for (let i = 0; i < parsedLines.length; i++) {
+          const item = parsedLines[i];
+          const activeVoiceId = item.isRole1 ? voice1 : voice2;
+          const pct = Math.round(((i + 1) / parsedLines.length) * 100);
+
+          progressText.textContent = `Nagrywa: ${item.speaker} (${i + 1}/${parsedLines.length})`;
+          progressBar.style.width = `${pct}%`;
+          progressPct.textContent = `${pct}%`;
+
+          // Odpytanie ElevenLabs Text-to-Speech API
+          const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${activeVoiceId}`, {
+            method: 'POST',
+            headers: {
+              'xi-api-key': apiKey,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              text: item.text,
+              model_id: selectedModel,
+              voice_settings: {
+                stability: stability,
+                similarity_boost: 0.80,
+                style: 0.15,
+                use_speaker_boost: true
+              }
+            })
+          });
+
+          if (!response.ok) {
+            const errJson = await response.json().catch(() => ({}));
+            throw new Error(errJson?.detail?.message || `Błąd ElevenLabs przy kwestii ${i + 1}`);
+          }
+
+          const arrayBuffer = await response.arrayBuffer();
+          const decoded = await audioContext.decodeAudioData(arrayBuffer);
+          collectedBuffers.push(decoded);
+
+          // Pauza oddechowa między wypowiedziami (cisza)
+          if (i < parsedLines.length - 1 && pauseDuration > 0) {
+            const pauseBuf = audioContext.createBuffer(1, Math.floor(audioContext.sampleRate * pauseDuration), audioContext.sampleRate);
+            collectedBuffers.push(pauseBuf);
+          }
+        }
+
+        progressText.textContent = 'Scalanie i mastering ścieżki audio...';
+
+        // Łączenie wszystkich buforów w jeden plik
+        const finalBuffer = mergeAudioBuffers(collectedBuffers, audioContext);
+        masterAudioBlob = bufferToWav(finalBuffer);
+
+        // Uruchomienie odtwarzacza
+        const audioUrl = URL.createObjectURL(masterAudioBlob);
+        const player = document.getElementById('mainAudioElement');
+        player.src = audioUrl;
+
+        document.getElementById('btnDownloadWav').disabled = false;
+        document.getElementById('playerSubtitle').textContent = `Wygenerowano ${parsedLines.length} kwestii dialogowych`;
+
+        hookAudioVisualizer(player);
+        showToast('Podcast wygenerowany pomyślnie!', 'success');
+        switchTab('player');
+      } catch (err) {
+        showToast('Błąd produkcji audio: ' + err.message, 'error');
+      } finally {
+        isSynthesizing = false;
+        btn.disabled = false;
+        btn.classList.remove('opacity-50');
+      }
+    }
+
+    // Łączenie buforów audio Web Audio API
+    function mergeAudioBuffers(buffers, ctx) {
+      let totalSamples = 0;
+      buffers.forEach(b => { totalSamples += b.length; });
+
+      const output = ctx.createBuffer(1, totalSamples, ctx.sampleRate);
+      const outData = output.getChannelData(0);
+
+      let offset = 0;
+      buffers.forEach(b => {
+        // Pobieramy pierwszy kanał (mono)
+        const inData = b.getChannelData(0);
+        outData.set(inData, offset);
+        offset += b.length;
+      });
+
+      return output;
+    }
+
+    // Konwersja AudioBuffer na uniwersalny plik WAV (PCM 16-bit)
+    function bufferToWav(abuffer) {
+      const numOfChan = 1;
+      const length = abuffer.length * numOfChan * 2 + 44;
+      const outBuffer = new ArrayBuffer(length);
+      const view = new DataView(outBuffer);
+      const channels = [abuffer.getChannelData(0)];
+      const sampleRate = abuffer.sampleRate;
+      let pos = 0;
+
+      function setUint16(data) { view.setUint16(pos, data, true); pos += 2; }
+      function setUint32(data) { view.setUint32(pos, data, true); pos += 4; }
+
+      // Nagłówek RIFF
+      setUint32(0x46464952); // "RIFF"
+      setUint32(length - 8); // rozmiar pliku
+      setUint32(0x45564157); // "WAVE"
+      setUint32(0x20746d66); // "fmt "
+      setUint32(16);         // długość subchunka
+      setUint16(1);          // format PCM
+      setUint16(numOfChan);
+      setUint32(sampleRate);
+      setUint32(sampleRate * 2 * numOfChan); // byte rate
+      setUint16(numOfChan * 2);              // block align
+      setUint16(16);                         // bity na próbkę
+      setUint32(0x61746164); // "data"
+      setUint32(length - pos - 4);
+
+      // Zapis próbek dźwiękowych
+      for (let i = 0; i < abuffer.length; i++) {
+        let sample = Math.max(-1, Math.min(1, channels[0][i]));
+        view.setInt16(pos, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+        pos += 2;
+      }
+
+      return new Blob([outBuffer], { type: 'audio/wav' });
+    }
+
+    // Pobieranie gotowego pliku audio
+    function downloadMasterAudioFile() {
+      if (!masterAudioBlob) {
+        showToast('Brak pliku audio do pobrania', 'error');
+        return;
+      }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(masterAudioBlob);
+      a.download = `podcast_ai_${Date.now()}.wav`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      showToast('Rozpoczęto pobieranie pliku WAV', 'success');
+    }
+
+    // Pobieranie scenariusza w pliku tekstowym
+    function exportScriptTextFile() {
+      const text = document.getElementById('rawScriptArea').value;
+      if (!text) {
+        showToast('Scenariusz jest pusty', 'error');
+        return;
+      }
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `scenariusz_podcastu_${Date.now()}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      showToast('Zapisano plik tekstowy', 'success');
+    }
+
+    // Wizualizacja Waveform na Canvasie
+    function setupWaveformCanvas() {
+      const canvas = document.getElementById('waveformCanvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = canvas.parentElement.clientWidth * window.devicePixelRatio;
+      canvas.height = canvas.parentElement.clientHeight * window.devicePixelRatio;
+      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    }
+
+    function hookAudioVisualizer(audioEl) {
+      document.getElementById('emptyWaveformNotice').classList.add('hidden');
+      if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+      if (!analyserNode) {
+        analyserNode = audioContext.createAnalyser();
+        analyserNode.fftSize = 128;
+        const source = audioContext.createMediaElementSource(audioEl);
+        source.connect(analyserNode);
+        analyserNode.connect(audioContext.destination);
+      }
+
+      const canvas = document.getElementById('waveformCanvas');
+      const canvasCtx = canvas.getContext('2d');
+      const bufferLength = analyserNode.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      function renderFrame() {
+        visualizerAnimationId = requestAnimationFrame(renderFrame);
+        analyserNode.getByteFrequencyData(dataArray);
+
+        const w = canvas.width / window.devicePixelRatio;
+        const h = canvas.height / window.devicePixelRatio;
+        canvasCtx.clearRect(0, 0, w, h);
+
+        const barWidth = (w / bufferLength) * 1.5;
+        let x = 0;
+
+        for (let i = 0; i < bufferLength; i++) {
+          const barHeight = (dataArray[i] / 255) * h * 0.9;
+          const gradient = canvasCtx.createLinearGradient(0, h, 0, 0);
+          gradient.addColorStop(0, '#4f46e5');
+          gradient.addColorStop(1, '#10b981');
+
+          canvasCtx.fillStyle = gradient;
+          canvasCtx.fillRect(x, h - barHeight, barWidth - 2, barHeight);
+          x += barWidth;
+        }
+      }
+
+      audioEl.onplay = () => {
+        if (audioContext.state === 'suspended') audioContext.resume();
+        renderFrame();
+      };
+      audioEl.onpause = () => cancelAnimationFrame(visualizerAnimationId);
+      audioEl.onended = () => cancelAnimationFrame(visualizerAnimationId);
+    }
+
+    // Rejestracja manifestu PWA w locie (bez zewnętrznych plików)
+    function setupDynamicPwaManifest() {
+      const manifest = {
+        name: "Podcast AI Studio",
+        short_name: "PodcastAI",
+        start_url: "./index.html",
+        display: "standalone",
+        background_color: "#09090b",
+        theme_color: "#09090b",
+        icons: [
+          {
+            src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%234f46e5'/><text y='.75em' x='50%' text-anchor='middle' font-size='60'>🎙️</text></svg>",
+            sizes: "192x192 512x512",
+            type: "image/svg+xml",
+            purpose: "any maskable"
+          }
+        ]
+      };
+      const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+      const manifestUrl = URL.createObjectURL(blob);
+      const link = document.createElement('link');
+      link.rel = 'manifest';
+      link.href = manifestUrl;
+      document.head.appendChild(link);
+    }
+  </script>
+</body>
+</html>
